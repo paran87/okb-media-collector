@@ -208,6 +208,22 @@ test("TEST 10: R2 failure is retried and then succeeds", { skip }, async () => {
   }
 });
 
+test("expired presigned upload URL (R2 answers 403): a new URL is requested and the upload succeeds", { skip }, async () => {
+  const env = await environment();
+  try {
+    env.r2.failNextPuts(1, 403);
+    env.platform.files.set("EXPURL", { bytes: F.jpeg(), mime: "image/jpeg" });
+    await postWa(env, [{ id: "wamid.EXPURL", type: "image", image: { id: "EXPURL", mime_type: "image/jpeg" } }]);
+    await drained(env);
+    const row = ingestion(env, "wamid.EXPURL");
+    assert.strictEqual(row.mediaStatus, "stored");
+    assert.strictEqual(env.r2.objects.size, 1);
+    assert.strictEqual(env.collector.metrics.get("upload_failures_total", { source: "whatsapp" }), 1);
+  } finally {
+    await env.close();
+  }
+});
+
 test("TEST 11: backend unavailable -> queued and retried, nothing lost", { skip }, async () => {
   const env = await environment((c) => {
     c.queue.maxAttempts = 50;

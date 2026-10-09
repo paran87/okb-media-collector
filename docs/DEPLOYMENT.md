@@ -5,16 +5,22 @@ The collector is deployed **independently** of the backend and the Android bridg
 
 ## 1. Database (Supabase) — additive
 
-Run the section **"OKB Media Collector"** at the end of `okb-bridge-cloud-backend/supabase-schema.sql` in the
-Supabase SQL editor of the project in the backend's `SUPABASE_URL`. It only creates
-`okb_ingested_media`, `okb_collector_status`, `okb_collector_settings` (RLS on) and is safe to re-run. Until it is
-applied the backend answers 503 on the collector routes and everything else works as before.
+Use `okb-bridge-cloud-backend/migrations/20261009_okb_media_collector.sql` (one transaction; never paste the whole
+`supabase-schema.sql`). It creates `okb_ingested_media`, `okb_collector_status`, `okb_collector_settings`, enables RLS
+and revokes all privileges from `anon`/`authenticated`. It alters, drops or writes no existing table or row and is
+safe to re-run. Validated on PostgreSQL 16 against the `main` schema (`migrations/test-local.sh`); Supabase runs 17.
+
+Order: **test project first.** Before production: Database → Backups (confirm a recent backup), then run the file in
+the SQL editor, then check Advisors → Security. Rollback: `20261009_okb_media_collector_rollback.sql`.
+Until the migration is applied the backend's collector routes answer 503 and everything else works as before.
 
 ## 2. Backend (okb-bridge-cloud-backend)
 
 1. Generate a token: `openssl rand -base64 36`.
-2. Set `OKB_COLLECTOR_TOKENS=<token>` on the Render service (must differ from device/admin tokens — the backend
-   refuses to start otherwise). Optional: `OKB_COLLECTOR_MAX_MEDIA_BYTES` (default 200 MiB).
+2. Set `OKB_COLLECTOR_TOKENS=<token>` on the Render service: at least 32 characters (shorter ones are ignored),
+   different from device/admin tokens (the backend refuses to start otherwise). To rotate, list the new and old token
+   (`new,old`), update the collector, then remove the old one. `OKB_ADMIN_TOKENS` must be set for the Command Center's
+   collector status/pause (device tokens are never accepted there). Optional: `OKB_COLLECTOR_MAX_MEDIA_BYTES` (default 200 MiB).
 3. Deploy the backend version that contains `lib/collector/`. Check `GET /api/v1/health` →
    `"mediaCollector":"available"`.
 
@@ -23,28 +29,48 @@ No R2 change is needed: objects go to the existing bucket under new prefixes `wh
 
 ## 3. Collector
 
-Where: it needs a **persistent disk** (durable queue) and a **public HTTPS URL** (webhooks).
+### Test service on Render (recommended first deployment)
+
+The collector needs a persistent disk (its queue and staged files live in `DATA_DIR`), so it needs a **paid**
+instance: Render's free web services cannot attach disks and sleep when idle. Verified price points (Oct 2026):
+Starter instance $7/month, disks $0.25/GB/month → about **$8.25/month** with a 5 GB disk.
+
+1. Render dashboard → **New → Web Service** → repository `paran87/okb-media-collector`, branch
+   `claude/sleepy-maxwell-29rgpb`, name `okb-media-collector-test`, region near the backend (Singapore if the
+   backend is there).
+2. Runtime **Docker** (the repository's `Dockerfile`; Node 22 Alpine, runs as non-root `node`). Instance type
+   **Starter**. Auto-deploy off.
+3. **Disks → Add disk**: mount path `/data`, 5 GB. (`DATA_DIR=/data` is already set in the image.)
+4. Health check path: `/health`.
+5. Environment (Dashboard → Environment, never in git): `OKB_BACKEND_URL` (the **test** backend's https URL),
+   `OKB_COLLECTOR_TOKEN` (a dedicated test token, ≥ 32 characters, also listed in the test backend's
+   `OKB_COLLECTOR_TOKENS`), `COLLECTOR_ID=okb-media-collector-test`, `METRICS_TOKEN`, `COLLECTOR_ADMIN_TOKEN`; keep
+   `WHATSAPP_ENABLED=false` and `VIBER_ENABLED=false` for the first deploy.
+6. Deploy → `GET https://okb-media-collector-test.onrender.com/health`: `okbBackend.status` becomes `connected` within
+   a minute (first heartbeat); `queue` is empty.
+7. Enable one platform with its credentials and allowlist; redeploy; run Test A / Test B in TEST-PLAN.md.
+
+Render sends SIGTERM on every deploy/restart; the collector stops accepting webhooks, saves running jobs and exits
+(forced after 25 s, within Render's 30 s). A service with a disk runs one instance, so each deploy has a short gap;
+WhatsApp redelivers webhooks it could not deliver.
+
+`render.yaml` describes the same service for a Blueprint (production name, no branch pinned).
+
+### Other hosts
 
 | Option | Notes |
 |---|---|
-| **Render (recommended, like the backend)** | `render.yaml` (Docker, Starter plan + 5 GB disk at `/data`). Render Free has no disk and sleeps: not suitable. |
-| VPS + Docker | `docker compose up -d` behind an HTTPS reverse proxy (Caddy/nginx) with a trusted certificate. |
+| VPS + Docker | `docker compose up -d` behind an HTTPS reverse proxy (Caddy/nginx) with a trusted certificate. Image build and container restart recovery verified locally. |
 | Local development | `npm ci && npm run build && node dist/src/index.js` with a `.env` exported in the shell; expose with a tunnel for webhooks. |
 
-Steps:
-1. Copy `.env.example` values into the service's environment (secrets via the host's secret store, never in git).
-2. Keep `WHATSAPP_ENABLED=false` / `VIBER_ENABLED=false` for the first deploy; check `/health`
-   (`okbBackend.status` becomes `connected` after the first heartbeat).
-3. Enable one platform with its allowlist; redeploy.
+### Platform setup
 
-### WhatsApp (Meta App Dashboard)
-- WhatsApp → Configuration → Webhook: callback `https://<collector>/webhooks/whatsapp`, verify token =
-  `WHATSAPP_VERIFY_TOKEN`; subscribe to `messages` (and `group_lifecycle_update`, `group_participants_update`,
-  `group_settings_update`, `group_status_update` if API-created groups are used).
-- Use a System User access token (long-lived) in `WHATSAPP_ACCESS_TOKEN`; `WHATSAPP_APP_SECRET` = App Secret.
+WhatsApp (Meta App Dashboard): WhatsApp → Configuration → Webhook: callback `https://<collector>/webhooks/whatsapp`,
+verify token = `WHATSAPP_VERIFY_TOKEN`; subscribe to `messages` (and `group_lifecycle_update`,
+`group_participants_update`, `group_settings_update`, `group_status_update` only if API-created groups are used).
+Use a System User access token; `WHATSAPP_APP_SECRET` = App Secret.
 
-### Viber
-- `VIBER_AUTH_TOKEN=… npm run viber:set-webhook -- https://<collector>/webhooks/viber` (collector must be running).
+Viber: `VIBER_AUTH_TOKEN=… npm run viber:set-webhook -- https://<collector>/webhooks/viber` (collector running).
 
 ## Health checks
 
@@ -79,8 +105,9 @@ Steps:
   service, remove the collector token from the backend.
 - **Backend:** redeploy the previous commit. The new routes disappear; existing data stays. Collector messages
   already stored are normal `okb_bridge_messages`/`okb_bridge_media` rows and keep working in reports.
-- **Database:** the new tables can stay (unused) or be dropped:
-  `drop table okb_ingested_media, okb_collector_status, okb_collector_settings;` — no existing table was altered.
+- **Database:** the new tables can stay (unused) or be removed with
+  `okb-bridge-cloud-backend/migrations/20261009_okb_media_collector_rollback.sql` (drops only those three tables;
+  collected messages/files stay in the existing tables and R2). No existing table was altered.
 - **Command Center:** revert the commit; the page and settings card disappear. Nothing else depends on them.
 
 ## Production gate (Phase 20)

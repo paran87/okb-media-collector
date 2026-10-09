@@ -327,7 +327,7 @@ export class MediaIngestionService {
       backend.uploadUrl(
         {
           source, platformMessageId: job.message.platformMessageId, platformMediaId: job.message.media?.platformMediaId ?? null,
-          sha256: f.sha256, fileSizeBytes: f.size, mimeType: f.detected.mime, mediaKind: f.detected.kind, fileName: f.originalFileName ?? `media.${f.detected.ext}`,
+          sha256: f.sha256, fileSizeBytes: f.size, mimeType: f.detected.mime, mediaKind: f.detected.kind, fileName: f.originalFileName,
           receivedAt: job.message.receivedAt,
         },
         job.key,

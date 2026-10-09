@@ -30,7 +30,8 @@ export function waSigned(body: unknown, secret = SECRETS.waAppSecret): { raw: st
   return { raw, headers: { "Content-Type": "application/json", "X-Hub-Signature-256": `sha256=${hmacSha256Hex(secret, Buffer.from(raw))}` } };
 }
 
-let token = 5_000_000_000_000_000_001n;
+// Unique across processes (a fixed start collided between separate staging runs).
+let token = BigInt(Date.now()) * 1_000_000n + BigInt(process.pid % 1_000_000);
 export function viberMessage(message: Record<string, unknown>, sender = VIBER_SENDER): string {
   token += 1n;
   // message_token as a bare 64-bit JSON number, like Viber sends it.

@@ -22,9 +22,10 @@ WhatsApp Cloud API / Viber Bot API ──signed webhook──▶ collector (allo
 Details and sources: [docs/CAPABILITIES.md](docs/CAPABILITIES.md). No unofficial adapter is included; the
 evaluation of WhatsApp Web / Viber automation and why it was not built is in the same document.
 
-**Status:** implemented and tested automatically (see [docs/TEST-PLAN.md](docs/TEST-PLAN.md)). **Not yet tested
-with real WhatsApp/Viber accounts** — do not rely on any platform capability before the Phase 18 checklist has
-been run.
+**Status (9 Oct 2026):** implemented; 39 automated tests pass; validated on a local staging stack (real
+PostgreSQL/PostgREST, the branch backend, the Docker image, the Command Center) with **simulated** WhatsApp/Viber
+APIs — see [docs/TEST-PLAN.md](docs/TEST-PLAN.md). **Not yet deployed to a test environment and not yet tested with
+real WhatsApp/Viber accounts**; do not rely on any platform capability before Test A / Test B have been run.
 
 ## Quick start (local)
 

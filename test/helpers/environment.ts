@@ -102,14 +102,15 @@ export async function fakePlatform() {
 export async function fakeR2() {
   const objects = new Map<string, { bytes: Buffer; contentType: string | undefined; contentLength: string | undefined }>();
   let failPuts = 0;
+  let failStatus = 500;
   const server = createServer(async (req, res) => {
     const key = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname.slice(1));
     if (req.method === "PUT") {
       const b = await body(req);
       if (failPuts > 0) {
         failPuts--;
-        res.writeHead(500);
-        return res.end("<Error><Code>InternalError</Code></Error>");
+        res.writeHead(failStatus);
+        return res.end(failStatus === 403 ? "<Error><Code>AccessDenied</Code><Message>Request has expired</Message></Error>" : "<Error><Code>InternalError</Code></Error>");
       }
       objects.set(key, { bytes: b, contentType: req.headers["content-type"], contentLength: req.headers["content-length"] });
       res.writeHead(200, { ETag: '"e"' });
@@ -127,8 +128,9 @@ export async function fakeR2() {
   const url = (k: string) => `${base}/${encodeURIComponent(k)}`;
   return {
     server, objects,
-    failNextPuts(n: number) {
+    failNextPuts(n: number, status = 500) {
       failPuts = n;
+      failStatus = status;
     },
     client: {
       presignPut: (k: string, o: { contentType?: string } = {}) => ({ url: url(k), method: "PUT", headers: o.contentType ? { "Content-Type": o.contentType } : {}, expiresAt: new Date(Date.now() + 9e5).toISOString(), objectKey: k }),

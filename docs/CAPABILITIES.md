@@ -1,4 +1,4 @@
-# Platform capabilities (checked 9 October 2026)
+# Platform capabilities (checked 9 October 2026; statuses updated after staging validation)
 
 This page records what the **official** WhatsApp and Viber APIs can and cannot do for OKB, from the platforms' own
 documentation. The collector only implements what is listed as supported here. Anything marked
@@ -11,6 +11,50 @@ Sources:
 - Meta, Media API: <https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/media/>
 - Meta, WhatsApp changelog: <https://developers.facebook.com/documentation/business-messaging/whatsapp/changelog>
 - Rakuten Viber, REST Bot API: <https://developers.viber.com/docs/api/rest-bot-api/>
+
+## Status of each capability (9 October 2026)
+
+Legend: **Yes** = done and evidenced · **No** = not done · **n/a** = cannot apply. "Simulated" = automated tests and the
+local staging stack, where WhatsApp/Viber are local fakes built from the documented payloads. Only the
+"Real account" column proves what the platforms actually deliver, and it is empty because no real account has
+been connected yet.
+
+| Capability | Implemented in code | Passed simulated tests | Passed real-account tests | Deployed to test | Ready for production | Unsupported by the platform |
+|---|---|---|---|---|---|---|
+| WhatsApp: read existing ordinary OKB groups | No (nothing official to call) | n/a | n/a | n/a | n/a | **Yes — unsupported** (`OFFICIAL_WHATSAPP_MEDIA_CAPTURE_LIMITATION`) |
+| WhatsApp 1:1 to OKB business number: text | Yes | Yes | No | No | No | No |
+| WhatsApp 1:1: photo / PDF / DOCX / XLSX / video | Yes | Yes | No | No | No | No |
+| WhatsApp API-created group (≤ 8, OBA): text | Yes | Yes | No | No | No | No |
+| WhatsApp API-created group: photo / documents | Yes | Yes | No | No | No | **Unknown** — Meta documents text only; needs real Test A |
+| Viber: read existing groups / Communities | No (nothing official to call) | n/a | n/a | n/a | n/a | **Yes — unsupported** (`VIBER_MEDIA_CAPTURE_UNSUPPORTED`) |
+| Viber 1:1 to OKB bot: text / photo / video | Yes | Yes | No | No | No | No |
+| Viber 1:1: PDF / DOCX from a user | Yes (handled if it arrives) | Yes | No | No | No | **Probably** — Viber docs say `file` is not supported user→bot |
+| Storage in R2, SHA-256 dedupe, verification before "stored" | Yes | Yes (staging: byte-identical objects) | No | No | No | n/a |
+| Queue, retries, restart recovery (Docker image + volume) | Yes | Yes (container tested) | n/a | No | No | n/a |
+| Command Center media page, signed links, pause/resume | Yes | Yes (staging, real PostgreSQL/PostgREST) | n/a | No | No | n/a |
+| Experimental WhatsApp Web / Viber automation | **No — deliberately not built** | n/a | n/a | n/a | n/a | Against platform terms |
+
+## Direct answers
+
+1. **Can the official WhatsApp integration receive messages from our existing ordinary reporting GC?** No. The
+   Cloud API cannot join or read a group it did not create. This is a platform limitation, not missing configuration.
+2. **Can it download original photos from that GC?** No (it receives nothing from that GC).
+3. **Can it download PDFs and Word documents?** Yes, when they are sent **1:1 to the OKB business number**
+   (documented Media API; up to 100 MB on WhatsApp's side, 50 MB by our default limit). For API-created groups it
+   is not documented and must be tested. Never from the existing GC.
+4. **Can the official Viber integration read our existing GC?** No. Bots only have 1:1 conversations.
+5. **Can it download original photos and documents?** Photos and videos sent 1:1 to the bot: yes (URL valid 1 hour).
+   Documents: Viber documents them as not supported from user to bot — expect no.
+6. **Which workflows still require the Android phone?** Everything that depends on the existing ordinary WhatsApp
+   groups: capturing reports from the source group (notifications), and sending the automated consolidated TEXT
+   and the PDF into the destination group (the Cloud API cannot post into an ordinary group either).
+7. **Which reporting workflows can run entirely on Render?** Reporters who send text/photos/documents **directly**
+   to an OKB WhatsApp Business number (or text/photos/videos to an OKB Viber bot) → collector → backend → R2 → AI →
+   Command Center. No phone involved. Also any reporting group created by an OBA through the Groups API (≤ 8 people),
+   subject to Test A confirming media.
+8. **What limitations remain?** Existing groups are out of reach of official APIs; API-created WhatsApp groups are
+   capped at 8 and need an OBA; Viber needs a commercial bot and has no groups or (probably) documents; photos and
+   videos may be compressed by the platform; no text extraction from PDF/DOCX into the AI yet; no real-account test yet.
 
 ## Summary
 

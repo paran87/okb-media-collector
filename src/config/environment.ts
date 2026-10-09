@@ -150,7 +150,7 @@ export function loadConfig(env: Env = process.env): Config {
   else if (production && !backendUrl.startsWith("https://")) problems.push("OKB_BACKEND_URL must use https in production");
   const backendToken = str(env, "OKB_COLLECTOR_TOKEN");
   if (!backendToken) problems.push("OKB_COLLECTOR_TOKEN is required");
-  else if (backendToken.length < 24) problems.push("OKB_COLLECTOR_TOKEN must be at least 24 characters");
+  else if (backendToken.length < 32) problems.push("OKB_COLLECTOR_TOKEN must be at least 32 characters (the backend ignores shorter collector tokens)");
 
   // ---- WhatsApp (official Cloud API only) ----
   const waEnabled = bool(env, "WHATSAPP_ENABLED", false, problems);
