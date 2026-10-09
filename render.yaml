@@ -1,0 +1,49 @@
+# Render Blueprint for the OKB Media Collector (separate service; the OKB bridge backend is unchanged).
+# A persistent disk is required for the durable queue, so this needs a paid instance type (Render's Free plan
+# has no disks and sleeps when idle). Without a disk, queued items would be lost on every restart/deploy.
+services:
+  - type: web
+    name: okb-media-collector
+    runtime: docker
+    plan: starter
+    autoDeploy: false
+    healthCheckPath: /health
+    disk:
+      name: collector-data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: OKB_BACKEND_URL
+        sync: false
+      - key: OKB_COLLECTOR_TOKEN
+        sync: false
+      - key: WHATSAPP_ENABLED
+        value: "false"
+      - key: WHATSAPP_GRAPH_API_VERSION
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_ALLOWED_GROUP_IDS
+        sync: false
+      - key: WHATSAPP_ALLOWED_SENDER_IDS
+        sync: false
+      - key: VIBER_ENABLED
+        value: "false"
+      - key: VIBER_AUTH_TOKEN
+        sync: false
+      - key: VIBER_ALLOWED_SENDER_IDS
+        sync: false
+      - key: METRICS_TOKEN
+        sync: false
+      - key: COLLECTOR_ADMIN_TOKEN
+        sync: false

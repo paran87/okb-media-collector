@@ -1,0 +1,23 @@
+# Local / VPS deployment. Configure .env first (copy .env.example). Put HTTPS (reverse proxy) in front of it:
+# WhatsApp and Viber only call https webhooks with a certificate from a trusted CA.
+services:
+  okb-media-collector:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - collector-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    stop_grace_period: 30s
+volumes:
+  collector-data:

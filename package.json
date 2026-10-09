@@ -1,0 +1,22 @@
+{
+  "name": "okb-media-collector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OKB Media Collector: collects messages and media from authorized OKB reporting channels through the official WhatsApp Cloud API and Viber Bot API, and hands them to the OKB backend (Cloudflare R2 + Supabase).",
+  "main": "dist/src/index.js",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test dist/test/*.test.js",
+    "clean": "rm -rf dist",
+    "viber:set-webhook": "node dist/src/tools/viber-set-webhook.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}
