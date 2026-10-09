@@ -89,6 +89,23 @@ Viber Bot API (local fakes), and R2 (a local stand-in for presigned PUT/HEAD/GET
 | Pause/Resume from Settings: written to the database with the operator name; backend answers 423 to the collector; nothing deleted; Android `/messages` and `run-due` still 201/200 | Pass |
 | Defects found and fixed during this validation | Duplicate sign-in form on Settings; invented `media.jpg` original filename; device tokens accepted on collector admin routes when `OKB_ADMIN_TOKENS` is unset; weak collector tokens accepted |
 
+## Android bridge photo path (9 October 2026) — see E2E-ANDROID-PHOTO-TEST-REPORT.md
+
+The existing ordinary WhatsApp group can only be read by the **Android bridge**, not by this collector. Its photo
+path (notification → phone → `/api/v1/media/*` → R2 → `okb_bridge_media` → Media page) was traced and tested in
+[E2E-ANDROID-PHOTO-TEST-REPORT.md](E2E-ANDROID-PHOTO-TEST-REPORT.md).
+
+| ID | Test | Real accounts | SIMULATED (local stack, real backend + Command Center code) |
+|---|---|---|---|
+| 1 | New WhatsApp group photo reaches the Media page | **BLOCKED** (no phone / staging R2 / reachable OKB Supabase) | PASS — byte-identical in R2, one row, listed, signed link, appears within 60 s |
+| 2 | Duplicate photo and redelivery | **BLOCKED** | PASS — one object, one media row, one link per message |
+| 3 | PDF attachment | **BLOCKED** | PASS — byte-identical, `application/pdf`, filename kept |
+| 4 | Backend outage and recovery | **BLOCKED** | PASS — delivered once after restart (queue is on the phone) |
+| 5 | Inaccessible attachment | **BLOCKED** | PASS — refused with 409, no record, nothing listed |
+
+Phase 2 (does the phone get the photo bytes at all?) is **BLOCKED** pending the 5-minute probe in §10 step 3 of the
+report. Reproduce the simulated run with `docs/e2e-android-local/` (instructions in its README).
+
 ## Real-account tests (Phase 18) — NOT RUN
 
 Nothing below has been run. Fill the "Actual" column only from real messages sent from real phones to real
